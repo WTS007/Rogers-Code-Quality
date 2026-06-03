@@ -426,6 +426,9 @@ jobs:
           > ⚠️ **Review carefully.** This PR was generated automatically by the Nexus AI remediation engine.
           > Confidence scores below 0.7 should be reviewed with extra scrutiny."
 
+          gh label create ai-remediation --color D4C5F9 --description "AI generated remediation" || true
+          gh label create automated --color 5319E7 --description "Automated action" || true
+
           gh pr create \
             --base "$TARGET" \
             --head "$BRANCH_NAME" \
