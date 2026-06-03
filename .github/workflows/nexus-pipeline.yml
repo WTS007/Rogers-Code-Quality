@@ -78,6 +78,30 @@ jobs:
           fetch-depth: 0
 
       # -----------------------------------------------------------------------
+      # Load Linter Enable Status from Configuration
+      # -----------------------------------------------------------------------
+      - name: Load Linter Configurations
+        id: linter_rules
+        run: |
+          CONFIG_FILE=".github/configs/nexus-rules.json"
+          ESLINT_ENABLED="false"
+          BANDIT_ENABLED="false"
+          CHECKOV_ENABLED="false"
+          if [[ -f "$CONFIG_FILE" ]]; then
+            ESLINT_ENABLED=$(jq -r '.linter_configs.eslint.enabled // "false"' "$CONFIG_FILE")
+            BANDIT_ENABLED=$(jq -r '.linter_configs.bandit.enabled // "false"' "$CONFIG_FILE")
+            CHECKOV_ENABLED=$(jq -r '.linter_configs.checkov.enabled // "false"' "$CONFIG_FILE")
+          fi
+          # If manual input overrides to true, keep it true
+          if [[ "${{ inputs.enable_eslint }}" == "true" ]]; then ESLINT_ENABLED="true"; fi
+          if [[ "${{ inputs.enable_bandit }}" == "true" ]]; then BANDIT_ENABLED="true"; fi
+          if [[ "${{ inputs.enable_checkov }}" == "true" ]]; then CHECKOV_ENABLED="true"; fi
+
+          echo "eslint_enabled=${ESLINT_ENABLED}" >> "$GITHUB_OUTPUT"
+          echo "bandit_enabled=${BANDIT_ENABLED}" >> "$GITHUB_OUTPUT"
+          echo "checkov_enabled=${CHECKOV_ENABLED}" >> "$GITHUB_OUTPUT"
+
+      # -----------------------------------------------------------------------
       # CodeQL — Initialize
       # -----------------------------------------------------------------------
       - name: Initialize CodeQL (${{ matrix.language }})
@@ -105,7 +129,7 @@ jobs:
       # PLUGIN: ESLint (optional)
       # -----------------------------------------------------------------------
       - name: "🔌 Run ESLint"
-        if: inputs.enable_eslint == true
+        if: steps.linter_rules.outputs.eslint_enabled == 'true'
         run: |
           bash .github/scripts/linter-plugins.sh eslint
         env:
@@ -115,7 +139,7 @@ jobs:
       # PLUGIN: Bandit (optional)
       # -----------------------------------------------------------------------
       - name: "🔌 Run Bandit"
-        if: inputs.enable_bandit == true
+        if: steps.linter_rules.outputs.bandit_enabled == 'true'
         run: |
           bash .github/scripts/linter-plugins.sh bandit
         env:
@@ -125,7 +149,7 @@ jobs:
       # PLUGIN: Checkov (optional)
       # -----------------------------------------------------------------------
       - name: "🔌 Run Checkov"
-        if: inputs.enable_checkov == true
+        if: steps.linter_rules.outputs.checkov_enabled == 'true'
         run: |
           bash .github/scripts/linter-plugins.sh checkov
         env:
