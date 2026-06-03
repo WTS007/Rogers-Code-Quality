@@ -20,15 +20,15 @@ Collecting pluggy<2,>=1.5 (from pytest>=8.0.0->-r requirements.txt (line 2))
   Downloading pluggy-1.6.0-py3-none-any.whl.metadata (4.8 kB)
 Requirement already satisfied: pygments>=2.7.2 in /usr/lib/python3/dist-packages (from pytest>=8.0.0->-r requirements.txt (line 2)) (2.17.2)
 Downloading flask-3.1.3-py3-none-any.whl (103 kB)
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 103.4/103.4 kB 17.6 MB/s eta 0:00:00
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 103.4/103.4 kB 3.8 MB/s eta 0:00:00
 Downloading pytest-9.0.3-py3-none-any.whl (375 kB)
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 375.2/375.2 kB 93.2 MB/s eta 0:00:00
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 375.2/375.2 kB 7.0 MB/s eta 0:00:00
 Downloading blinker-1.9.0-py3-none-any.whl (8.5 kB)
 Downloading iniconfig-2.3.0-py3-none-any.whl (7.5 kB)
 Downloading itsdangerous-2.2.0-py3-none-any.whl (16 kB)
 Downloading pluggy-1.6.0-py3-none-any.whl (20 kB)
 Downloading werkzeug-3.1.8-py3-none-any.whl (226 kB)
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 226.5/226.5 kB 86.3 MB/s eta 0:00:00
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 226.5/226.5 kB 41.1 MB/s eta 0:00:00
 Installing collected packages: werkzeug, pluggy, itsdangerous, iniconfig, blinker, pytest, flask
 Successfully installed blinker-1.9.0 flask-3.1.3 iniconfig-2.3.0 itsdangerous-2.2.0 pluggy-1.6.0 pytest-9.0.3 werkzeug-3.1.8
 ============================= test session starts ==============================
@@ -440,4 +440,4 @@ FAILED tests/test_database.py::TestDatabase::test_audit_log_records_events - sql
 FAILED tests/test_database.py::TestDatabase::test_create_and_get_user - sqlite3.OperationalError: no such table: users
 FAILED tests/test_database.py::TestDatabase::test_get_nonexistent_user - sqlite3.OperationalError: no such table: users
 FAILED tests/test_database.py::TestDatabase::test_init_db_creates_tables - AssertionError: 'users' not found in set()
-========================= 11 failed, 7 passed in 1.80s =========================
+========================= 11 failed, 7 passed in 1.70s =========================
