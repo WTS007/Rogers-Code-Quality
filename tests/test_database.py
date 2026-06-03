@@ -15,15 +15,28 @@ from src.database import init_db, create_user, get_user, log_audit_event, get_re
 from src.auth import hash_password
 
 
-DB_PATH = ":memory:"
+DB_PATH = "test_nexus_temp.db"
 
 
 class TestDatabase(unittest.TestCase):
     """Test suite for the database module."""
 
     def setUp(self):
-        """Initialize a fresh in-memory database before each test."""
+        """Initialize a fresh temporary database before each test."""
+        if os.path.exists(DB_PATH):
+            try:
+                os.remove(DB_PATH)
+            except OSError:
+                pass
         init_db(DB_PATH)
+
+    def tearDown(self):
+        """Clean up database file after test execution."""
+        if os.path.exists(DB_PATH):
+            try:
+                os.remove(DB_PATH)
+            except OSError:
+                pass
 
     def test_init_db_creates_tables(self):
         """init_db should create 'users' and 'audit_log' tables."""

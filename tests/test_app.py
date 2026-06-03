@@ -19,10 +19,23 @@ class TestAppEndpoints(unittest.TestCase):
     """Test suite for the Nexus Demo API application routes."""
 
     def setUp(self):
-        """Create a test client with an in-memory database."""
+        """Create a test client with a clean temporary database."""
         os.environ["APP_ENV"] = "testing"
+        if os.path.exists("nexus_test.db"):
+            try:
+                os.remove("nexus_test.db")
+            except OSError:
+                pass
         self.app = create_app("testing")
         self.client = self.app.test_client()
+
+    def tearDown(self):
+        """Clean up database file after test execution."""
+        if os.path.exists("nexus_test.db"):
+            try:
+                os.remove("nexus_test.db")
+            except OSError:
+                pass
 
     def test_health_endpoint(self):
         """GET /api/health should return 200 with status field."""

@@ -42,10 +42,10 @@ class ProductionConfig(Config):
 
 
 class TestConfig(Config):
-    """Test environment — in-memory database."""
+    """Test environment — temporary database."""
 
     TESTING = True
-    DATABASE_PATH = ":memory:"
+    DATABASE_PATH = "nexus_test.db"
     LOG_LEVEL = "DEBUG"
     TOKEN_EXPIRY_HOURS = 1
 
