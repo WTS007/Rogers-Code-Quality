@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Project Nexus — Linter Plugin Architecture
+# Project Nexus — Linter Plugin Architecture (normalized LF)
 # =============================================================================
 # Modular linter runner with plugin registration mechanism.
 # Runs specified linters and outputs results in unified JSON format.

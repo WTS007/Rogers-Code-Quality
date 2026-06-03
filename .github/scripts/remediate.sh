@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Project Nexus — AI Remediation Script
+# Project Nexus — AI Remediation Script (normalized LF)
 # =============================================================================
 # Parses build error logs and generates contextual fixes.
 # Accepts error log via stdin or file path argument.
