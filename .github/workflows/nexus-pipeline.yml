@@ -106,8 +106,8 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Normalize script line endings
         run: |
-          sed -i 's/\r$//' .github/scripts/linter-plugins.sh || true
-          sed -i 's/\r$//' .github/scripts/remediate.sh || true
+          tr -d '\r' < .github/scripts/linter-plugins.sh > linter-plugins-temp.sh && mv linter-plugins-temp.sh .github/scripts/linter-plugins.sh
+          tr -d '\r' < .github/scripts/remediate.sh > remediate-temp.sh && mv remediate-temp.sh .github/scripts/remediate.sh
 
       # -----------------------------------------------------------------------
       # CodeQL — Initialize
@@ -357,7 +357,7 @@ jobs:
       - name: Execute remediation
         id: remediate
         run: |
-          sed -i 's/\r$//' .github/scripts/remediate.sh || true
+          tr -d '\r' < .github/scripts/remediate.sh > remediate-temp.sh && mv remediate-temp.sh .github/scripts/remediate.sh
           chmod +x .github/scripts/remediate.sh
 
           ERROR_LOG=".nexus-artifacts/error_log.txt"
