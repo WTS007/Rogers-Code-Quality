@@ -1,0 +1,10 @@
+{
+  "strategy": "test_failure_triage",
+  "files_modified": [
+  ".nexus-test-failures.log"
+],
+  "confidence": 0.30,
+  "timestamp": "2026-06-03T10:23:19Z",
+  "pipeline": "nexus-ai-remediation",
+  "strictness": "medium"
+}
