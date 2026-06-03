@@ -383,9 +383,13 @@ main() {
     # Count matches to determine primary strategy
     local mf_count se_count de_count tf_count
     mf_count=$(echo "$missing_files" | grep -c . 2>/dev/null || echo 0)
+    mf_count="${mf_count//[$'\r']/}"
     se_count=$(echo "$syntax_errors" | grep -c . 2>/dev/null || echo 0)
+    se_count="${se_count//[$'\r']/}"
     de_count=$(echo "$dep_errors" | grep -c . 2>/dev/null || echo 0)
+    de_count="${de_count//[$'\r']/}"
     tf_count=$(echo "$test_failures" | grep -c . 2>/dev/null || echo 0)
+    tf_count="${tf_count//[$'\r']/}"
 
     log_info "Classification: missing_files=$mf_count syntax=$se_count deps=$de_count tests=$tf_count"
 
