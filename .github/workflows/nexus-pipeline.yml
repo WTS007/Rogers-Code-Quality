@@ -206,7 +206,7 @@ jobs:
 
           if [[ -f "$BUILD_CONFIG" ]]; then
             echo "[nexus] Found $BUILD_CONFIG — executing build configuration..."
-            source "$BUILD_CONFIG" 2> >(tee /tmp/build_stderr.log >&2)
+            source "$BUILD_CONFIG" > >(tee /tmp/build_stderr.log) 2>&1
             BUILD_EXIT=$?
           else
             echo "[nexus] No $BUILD_CONFIG found — running default build steps..."
@@ -214,18 +214,18 @@ jobs:
             # Default build: detect project type and run appropriate commands
             if [[ -f "package.json" ]]; then
               echo "[nexus] Detected Node.js project"
-              npm ci 2> >(tee -a /tmp/build_stderr.log >&2) && \
-              npm run build 2> >(tee -a /tmp/build_stderr.log >&2) && \
-              npm test 2> >(tee -a /tmp/build_stderr.log >&2)
+              npm ci > >(tee -a /tmp/build_stderr.log) 2>&1 && \
+              npm run build > >(tee -a /tmp/build_stderr.log) 2>&1 && \
+              npm test > >(tee -a /tmp/build_stderr.log) 2>&1
               BUILD_EXIT=$?
             elif [[ -f "requirements.txt" ]] || [[ -f "setup.py" ]] || [[ -f "pyproject.toml" ]]; then
               echo "[nexus] Detected Python project"
-              pip install -r requirements.txt 2> >(tee -a /tmp/build_stderr.log >&2) || true
-              python -m pytest 2> >(tee -a /tmp/build_stderr.log >&2)
+              pip install -r requirements.txt > >(tee -a /tmp/build_stderr.log) 2>&1 || true
+              python -m pytest > >(tee -a /tmp/build_stderr.log) 2>&1
               BUILD_EXIT=$?
             elif [[ -f "Makefile" ]]; then
               echo "[nexus] Detected Makefile project"
-              make all 2> >(tee -a /tmp/build_stderr.log >&2)
+              make all > >(tee -a /tmp/build_stderr.log) 2>&1
               BUILD_EXIT=$?
             else
               echo "[nexus] No recognized build system — skipping build"
