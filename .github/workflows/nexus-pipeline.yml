@@ -282,7 +282,7 @@ jobs:
     timeout-minutes: 20
 
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.NEXUS_PAT || secrets.GITHUB_TOKEN }}
       STRICTNESS_LEVEL: ${{ inputs.strictness_level || 'medium' }}
       TARGET_BRANCH: ${{ inputs.target_branch || 'main' }}
 
@@ -291,7 +291,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.NEXUS_PAT || secrets.GITHUB_TOKEN }}
 
       # -----------------------------------------------------------------------
       # Download error log artifact
