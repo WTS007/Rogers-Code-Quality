@@ -1,0 +1,444 @@
+# =============================================================================
+# Project Nexus — Master CI/CD Pipeline
+# =============================================================================
+# Unified workflow: lint-and-scan → build-and-test → ai-remediation
+# Supports CodeQL, pluggable linters, AI-driven build failure remediation,
+# and enterprise bypass rules for security-critical changes.
+# =============================================================================
+
+name: "Nexus Pipeline"
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+  push:
+    branches: [main]
+
+  workflow_dispatch:
+    inputs:
+      enable_eslint:
+        description: "Enable ESLint scanning"
+        type: boolean
+        default: false
+      enable_bandit:
+        description: "Enable Bandit (Python security) scanning"
+        type: boolean
+        default: false
+      enable_checkov:
+        description: "Enable Checkov (IaC security) scanning"
+        type: boolean
+        default: false
+      strictness_level:
+        description: "Quality gate strictness"
+        type: choice
+        options:
+          - low
+          - medium
+          - high
+          - critical
+        default: medium
+      target_branch:
+        description: "Target branch for remediation PRs"
+        type: string
+        default: "main"
+
+permissions:
+  contents: write
+  pull-requests: write
+  security-events: write
+  actions: read
+
+concurrency:
+  group: nexus-${{ github.ref }}
+  cancel-in-progress: true
+
+# =============================================================================
+# JOB 1 — LINT & SCAN
+# =============================================================================
+jobs:
+  lint-and-scan:
+    name: "🔍 Lint & Security Scan"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, python]
+
+    steps:
+      # -----------------------------------------------------------------------
+      # Checkout
+      # -----------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # -----------------------------------------------------------------------
+      # CodeQL — Initialize
+      # -----------------------------------------------------------------------
+      - name: Initialize CodeQL (${{ matrix.language }})
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: +security-extended,security-and-quality
+
+      # -----------------------------------------------------------------------
+      # CodeQL — Autobuild
+      # -----------------------------------------------------------------------
+      - name: Autobuild (${{ matrix.language }})
+        uses: github/codeql-action/autobuild@v3
+
+      # -----------------------------------------------------------------------
+      # CodeQL — Analyze & Upload SARIF
+      # -----------------------------------------------------------------------
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+          upload: true
+
+      # -----------------------------------------------------------------------
+      # PLUGIN: ESLint (optional)
+      # -----------------------------------------------------------------------
+      - name: "🔌 Run ESLint"
+        if: inputs.enable_eslint == true
+        run: |
+          bash .github/scripts/linter-plugins.sh eslint
+        env:
+          STRICTNESS_LEVEL: ${{ inputs.strictness_level || 'medium' }}
+
+      # -----------------------------------------------------------------------
+      # PLUGIN: Bandit (optional)
+      # -----------------------------------------------------------------------
+      - name: "🔌 Run Bandit"
+        if: inputs.enable_bandit == true
+        run: |
+          bash .github/scripts/linter-plugins.sh bandit
+        env:
+          STRICTNESS_LEVEL: ${{ inputs.strictness_level || 'medium' }}
+
+      # -----------------------------------------------------------------------
+      # PLUGIN: Checkov (optional)
+      # -----------------------------------------------------------------------
+      - name: "🔌 Run Checkov"
+        if: inputs.enable_checkov == true
+        run: |
+          bash .github/scripts/linter-plugins.sh checkov
+        env:
+          STRICTNESS_LEVEL: ${{ inputs.strictness_level || 'medium' }}
+
+      # -----------------------------------------------------------------------
+      # Upload linter results as artifact
+      # -----------------------------------------------------------------------
+      - name: Upload linter results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-results-${{ matrix.language }}
+          path: |
+            **/lint-report.json
+            **/sarif-results/**
+          retention-days: 14
+
+  # ===========================================================================
+  # JOB 2 — BUILD & TEST
+  # ===========================================================================
+  build-and-test:
+    name: "🏗️ Build & Test"
+    runs-on: ubuntu-latest
+    needs: [lint-and-scan]
+    timeout-minutes: 30
+    continue-on-error: true
+
+    outputs:
+      build_outcome: ${{ steps.build.outcome }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # Build step — captures stderr on failure
+      # -----------------------------------------------------------------------
+      - name: Run build
+        id: build
+        run: |
+          set +e
+          echo "::group::Build Output"
+
+          BUILD_CONFIG="verified_build.config"
+
+          if [[ -f "$BUILD_CONFIG" ]]; then
+            echo "[nexus] Found $BUILD_CONFIG — executing build configuration..."
+            source "$BUILD_CONFIG" 2> >(tee /tmp/build_stderr.log >&2)
+            BUILD_EXIT=$?
+          else
+            echo "[nexus] No $BUILD_CONFIG found — running default build steps..."
+
+            # Default build: detect project type and run appropriate commands
+            if [[ -f "package.json" ]]; then
+              echo "[nexus] Detected Node.js project"
+              npm ci 2> >(tee -a /tmp/build_stderr.log >&2) && \
+              npm run build 2> >(tee -a /tmp/build_stderr.log >&2) && \
+              npm test 2> >(tee -a /tmp/build_stderr.log >&2)
+              BUILD_EXIT=$?
+            elif [[ -f "requirements.txt" ]] || [[ -f "setup.py" ]] || [[ -f "pyproject.toml" ]]; then
+              echo "[nexus] Detected Python project"
+              pip install -r requirements.txt 2> >(tee -a /tmp/build_stderr.log >&2) || true
+              python -m pytest 2> >(tee -a /tmp/build_stderr.log >&2)
+              BUILD_EXIT=$?
+            elif [[ -f "Makefile" ]]; then
+              echo "[nexus] Detected Makefile project"
+              make all 2> >(tee -a /tmp/build_stderr.log >&2)
+              BUILD_EXIT=$?
+            else
+              echo "[nexus] No recognized build system — skipping build"
+              BUILD_EXIT=0
+            fi
+          fi
+
+          echo "::endgroup::"
+
+          if [[ $BUILD_EXIT -ne 0 ]]; then
+            echo "[nexus] ❌ Build failed with exit code $BUILD_EXIT"
+            cp /tmp/build_stderr.log "${GITHUB_WORKSPACE}/error_log.txt" 2>/dev/null || \
+              echo "Build failed with exit code $BUILD_EXIT" > "${GITHUB_WORKSPACE}/error_log.txt"
+            echo "build_failed=true" >> "$GITHUB_OUTPUT"
+            exit 1
+          else
+            echo "[nexus] ✅ Build succeeded"
+            echo "build_failed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # -----------------------------------------------------------------------
+      # Upload error log on failure
+      # -----------------------------------------------------------------------
+      - name: Upload error log
+        if: failure() || steps.build.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-error-log
+          path: error_log.txt
+          retention-days: 7
+
+      # -----------------------------------------------------------------------
+      # Upload test results (always)
+      # -----------------------------------------------------------------------
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            **/test-results/
+            **/coverage/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # ===========================================================================
+  # JOB 3 — AI REMEDIATION
+  # ===========================================================================
+  ai-remediation:
+    name: "🤖 AI Remediation"
+    runs-on: ubuntu-latest
+    needs: [build-and-test]
+    if: needs.build-and-test.outputs.build_outcome == 'failure'
+    timeout-minutes: 20
+
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      STRICTNESS_LEVEL: ${{ inputs.strictness_level || 'medium' }}
+      TARGET_BRANCH: ${{ inputs.target_branch || 'main' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # -----------------------------------------------------------------------
+      # Download error log artifact
+      # -----------------------------------------------------------------------
+      - name: Download error log
+        uses: actions/download-artifact@v4
+        with:
+          name: build-error-log
+          path: .nexus-artifacts/
+
+      # -----------------------------------------------------------------------
+      # Load enterprise rules config
+      # -----------------------------------------------------------------------
+      - name: Load Nexus rules config
+        id: rules
+        run: |
+          CONFIG_FILE=".github/configs/nexus-rules.json"
+          if [[ -f "$CONFIG_FILE" ]]; then
+            echo "config_exists=true" >> "$GITHUB_OUTPUT"
+
+            # Extract strictness thresholds
+            LEVEL="${STRICTNESS_LEVEL}"
+            MAX_WARNINGS=$(jq -r ".strictness_levels.${LEVEL}.max_warnings // 50" "$CONFIG_FILE")
+            MAX_ERRORS=$(jq -r ".strictness_levels.${LEVEL}.max_errors // 0" "$CONFIG_FILE")
+            BLOCK_ON_SECURITY=$(jq -r ".strictness_levels.${LEVEL}.block_on_security // true" "$CONFIG_FILE")
+
+            echo "max_warnings=${MAX_WARNINGS}" >> "$GITHUB_OUTPUT"
+            echo "max_errors=${MAX_ERRORS}" >> "$GITHUB_OUTPUT"
+            echo "block_on_security=${BLOCK_ON_SECURITY}" >> "$GITHUB_OUTPUT"
+          else
+            echo "config_exists=false" >> "$GITHUB_OUTPUT"
+            echo "[nexus] ⚠️  No nexus-rules.json found — using defaults"
+          fi
+
+      # -----------------------------------------------------------------------
+      # Check for security-critical label (BYPASS MECHANISM)
+      # -----------------------------------------------------------------------
+      - name: Check security-critical bypass
+        id: bypass
+        if: github.event_name == 'pull_request'
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          if [[ -z "$PR_NUMBER" ]] || [[ "$PR_NUMBER" == "null" ]]; then
+            echo "is_security_critical=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          LABELS=$(gh pr view "$PR_NUMBER" --json labels -q '.labels[].name' 2>/dev/null || echo "")
+
+          if echo "$LABELS" | grep -q "security-critical"; then
+            echo "[nexus] 🔒 Security-critical label detected — manual approval required"
+            echo "is_security_critical=true" >> "$GITHUB_OUTPUT"
+
+            # Add needs-manual-approval label
+            gh pr edit "$PR_NUMBER" --add-label "needs-manual-approval" || true
+          else
+            echo "is_security_critical=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # -----------------------------------------------------------------------
+      # Run AI Remediation Script
+      # -----------------------------------------------------------------------
+      - name: Execute remediation
+        id: remediate
+        run: |
+          chmod +x .github/scripts/remediate.sh
+
+          ERROR_LOG=".nexus-artifacts/error_log.txt"
+          if [[ ! -f "$ERROR_LOG" ]]; then
+            echo "[nexus] ⚠️  No error log found — nothing to remediate"
+            echo '{"strategy":"no_errors","files_modified":[],"confidence":0.0}' > remediation_report.json
+            exit 0
+          fi
+
+          echo "[nexus] 📋 Error log contents:"
+          cat "$ERROR_LOG"
+          echo ""
+          echo "[nexus] 🤖 Running AI remediation..."
+
+          REPORT=$(.github/scripts/remediate.sh "$ERROR_LOG")
+          echo "$REPORT" > remediation_report.json
+
+          echo "[nexus] 📊 Remediation report:"
+          cat remediation_report.json | jq . 2>/dev/null || cat remediation_report.json
+
+          # Check if any files were modified
+          FILES_MODIFIED=$(echo "$REPORT" | jq -r '.files_modified | length' 2>/dev/null || echo "0")
+          echo "files_modified=${FILES_MODIFIED}" >> "$GITHUB_OUTPUT"
+
+      # -----------------------------------------------------------------------
+      # Create remediation branch and PR
+      # -----------------------------------------------------------------------
+      - name: Create remediation PR
+        if: steps.remediate.outputs.files_modified != '0' && steps.bypass.outputs.is_security_critical != 'true'
+        run: |
+          BRANCH_NAME="ai-remediation/patch-${{ github.run_id }}"
+          TARGET="${TARGET_BRANCH}"
+
+          # Configure git
+          git config user.name "nexus-bot[bot]"
+          git config user.email "nexus-bot[bot]@users.noreply.github.com"
+
+          # Create and push remediation branch
+          git checkout -b "$BRANCH_NAME"
+          git add -A
+          git diff --cached --quiet && { echo "[nexus] No changes to commit"; exit 0; }
+
+          git commit -m "fix: AI-generated remediation for build failure
+
+          Run ID: ${{ github.run_id }}
+          Trigger: ${{ github.event_name }}
+          Strictness: ${STRICTNESS_LEVEL}
+
+          Automated by Project Nexus AI Remediation Pipeline."
+
+          git push origin "$BRANCH_NAME"
+
+          # Create pull request
+          PR_BODY="## 🤖 AI Remediation — Automated Fix
+
+          **Pipeline Run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          **Trigger:** \`${{ github.event_name }}\` on \`${{ github.ref_name }}\`
+          **Strictness Level:** \`${STRICTNESS_LEVEL}\`
+
+          ### Remediation Report
+          \`\`\`json
+          $(cat remediation_report.json)
+          \`\`\`
+
+          ---
+          > ⚠️ **Review carefully.** This PR was generated automatically by the Nexus AI remediation engine.
+          > Confidence scores below 0.7 should be reviewed with extra scrutiny."
+
+          gh pr create \
+            --base "$TARGET" \
+            --head "$BRANCH_NAME" \
+            --title "fix: AI remediation for run #${{ github.run_id }}" \
+            --body "$PR_BODY" \
+            --label "ai-remediation,automated"
+
+      # -----------------------------------------------------------------------
+      # Security-critical: block auto-merge, notify
+      # -----------------------------------------------------------------------
+      - name: "🔒 Security bypass — block auto-merge"
+        if: steps.bypass.outputs.is_security_critical == 'true'
+        run: |
+          echo "::warning::Security-critical PR detected. Auto-merge blocked."
+          echo "[nexus] 🔒 Remediation changes prepared but NOT auto-merged."
+          echo "[nexus] 🔒 Label 'needs-manual-approval' has been applied."
+          echo "[nexus] 🔒 A team lead must review and approve this change."
+
+          # Still create the branch for review, but do NOT create a PR
+          BRANCH_NAME="ai-remediation/patch-${{ github.run_id }}-security-review"
+
+          git config user.name "nexus-bot[bot]"
+          git config user.email "nexus-bot[bot]@users.noreply.github.com"
+
+          git checkout -b "$BRANCH_NAME"
+          git add -A
+          git diff --cached --quiet && { echo "[nexus] No changes to commit"; exit 0; }
+
+          git commit -m "fix: AI remediation (SECURITY REVIEW REQUIRED)
+
+          ⚠️ This change is associated with a security-critical PR.
+          Manual approval is required before merge.
+
+          Run ID: ${{ github.run_id }}"
+
+          git push origin "$BRANCH_NAME"
+
+          echo "[nexus] Branch '$BRANCH_NAME' pushed for security review."
+
+      # -----------------------------------------------------------------------
+      # Upload remediation report
+      # -----------------------------------------------------------------------
+      - name: Upload remediation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: remediation-report
+          path: remediation_report.json
+          retention-days: 30

@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "_comment": "Project Nexus — Enterprise Rule Engine Configuration",
+  "_version": "1.0.0",
+
+  "strictness_levels": {
+    "low": {
+      "description": "Permissive — suitable for early development and prototyping",
+      "max_warnings": 100,
+      "max_errors": 20,
+      "block_on_security": false,
+      "auto_remediation": true,
+      "require_review": false,
+      "fail_on_lint": false
+    },
+    "medium": {
+      "description": "Balanced — default for feature branches and regular development",
+      "max_warnings": 50,
+      "max_errors": 5,
+      "block_on_security": true,
+      "auto_remediation": true,
+      "require_review": false,
+      "fail_on_lint": true
+    },
+    "high": {
+      "description": "Strict — for release candidates and staging branches",
+      "max_warnings": 10,
+      "max_errors": 1,
+      "block_on_security": true,
+      "auto_remediation": true,
+      "require_review": true,
+      "fail_on_lint": true
+    },
+    "critical": {
+      "description": "Zero tolerance — for production hotfixes and security patches",
+      "max_warnings": 0,
+      "max_errors": 0,
+      "block_on_security": true,
+      "auto_remediation": false,
+      "require_review": true,
+      "fail_on_lint": true
+    }
+  },
+
+  "bypass_rules": {
+    "_comment": "Conditions under which manual approval is required, overriding auto-remediation",
+    "require_manual_approval_when": [
+      {
+        "condition": "label_present",
+        "value": "security-critical",
+        "action": "add_label",
+        "action_value": "needs-manual-approval",
+        "description": "PRs labeled security-critical must be reviewed by a security lead"
+      },
+      {
+        "condition": "files_changed_contain",
+        "value": [
+          ".github/workflows/**",
+          "Dockerfile",
+          "docker-compose*.yml",
+          "**/secrets/**",
+          "**/*.pem",
+          "**/*.key"
+        ],
+        "action": "block_auto_merge",
+        "description": "Changes to CI/CD configs, containers, or secrets require manual review"
+      },
+      {
+        "condition": "confidence_below",
+        "value": 0.5,
+        "action": "add_label",
+        "action_value": "low-confidence-fix",
+        "description": "AI fixes with confidence below 0.5 require human review"
+      },
+      {
+        "condition": "strictness_level",
+        "value": "critical",
+        "action": "block_auto_remediation",
+        "description": "Critical strictness disables automatic remediation entirely"
+      }
+    ],
+    "exempt_users": [
+      "nexus-bot[bot]",
+      "dependabot[bot]"
+    ],
+    "exempt_paths": [
+      "docs/**",
+      "*.md",
+      "LICENSE",
+      ".gitignore"
+    ]
+  },
+
+  "linter_configs": {
+    "eslint": {
+      "enabled": false,
+      "version": "latest",
+      "config_file": ".eslintrc.json",
+      "extensions": [".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"],
+      "ignore_patterns": [
+        "node_modules/",
+        "dist/",
+        "build/",
+        "coverage/",
+        "*.min.js"
+      ],
+      "rules_override": {},
+      "max_file_size_kb": 500,
+      "fail_on_error": true,
+      "auto_fix": false
+    },
+    "bandit": {
+      "enabled": false,
+      "version": "latest",
+      "config_file": ".bandit.yml",
+      "target_dirs": ["."],
+      "exclude_dirs": [
+        ".venv",
+        "venv",
+        "node_modules",
+        ".git",
+        "__pycache__",
+        "tests"
+      ],
+      "severity_levels": ["MEDIUM", "HIGH"],
+      "confidence_levels": ["MEDIUM", "HIGH"],
+      "skipped_tests": [],
+      "fail_on_error": true
+    },
+    "checkov": {
+      "enabled": false,
+      "version": "latest",
+      "config_file": ".checkov.yml",
+      "frameworks": [
+        "terraform",
+        "dockerfile",
+        "docker_compose",
+        "github_actions",
+        "kubernetes"
+      ],
+      "skip_checks": [],
+      "hard_fail_on": [
+        "CKV_AWS_*",
+        "CKV_DOCKER_*"
+      ],
+      "soft_fail": false,
+      "compact_output": true
+    }
+  },
+
+  "model_config": {
+    "_comment": "BYOM (Bring Your Own Model) — Configure your LLM endpoint for AI-powered remediation",
+    "endpoint_url": "",
+    "api_key_secret_name": "NEXUS_MODEL_API_KEY",
+    "model_name": "gpt-4",
+    "temperature": 0.2,
+    "max_tokens": 4096,
+    "timeout_seconds": 30,
+    "retry_attempts": 3,
+    "retry_delay_seconds": 2,
+    "system_prompt": "You are a code remediation assistant for the Nexus CI/CD pipeline. Generate minimal, correct, and secure patches. Always explain your reasoning.",
+    "supported_providers": {
+      "openai": {
+        "api_base": "https://api.openai.com/v1",
+        "models": ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"]
+      },
+      "azure_openai": {
+        "api_base": "",
+        "deployment_name": "",
+        "api_version": "2024-02-01"
+      },
+      "anthropic": {
+        "api_base": "https://api.anthropic.com/v1",
+        "models": ["claude-3-opus", "claude-3-sonnet", "claude-3-haiku"]
+      },
+      "local": {
+        "api_base": "http://localhost:8080/v1",
+        "models": ["codellama", "deepseek-coder"]
+      }
+    },
+    "fallback_strategy": "log_and_skip"
+  },
+
+  "notifications": {
+    "on_remediation_success": {
+      "enabled": true,
+      "channels": ["pr_comment", "commit_status"]
+    },
+    "on_remediation_failure": {
+      "enabled": true,
+      "channels": ["pr_comment", "commit_status", "issue_create"]
+    },
+    "on_security_bypass": {
+      "enabled": true,
+      "channels": ["pr_comment", "commit_status", "team_mention"],
+      "mention_teams": ["@security-team"]
+    }
+  },
+
+  "retention": {
+    "artifact_days": 30,
+    "error_logs_days": 14,
+    "remediation_reports_days": 90,
+    "sarif_results_days": 60
+  }
+}
