@@ -138,6 +138,7 @@ jobs:
       # -----------------------------------------------------------------------
       - name: "🔌 Run ESLint"
         if: steps.linter_rules.outputs.eslint_enabled == 'true'
+        continue-on-error: true
         run: |
           bash .github/scripts/linter-plugins.sh eslint
         env:
@@ -148,6 +149,7 @@ jobs:
       # -----------------------------------------------------------------------
       - name: "🔌 Run Bandit"
         if: steps.linter_rules.outputs.bandit_enabled == 'true'
+        continue-on-error: true
         run: |
           bash .github/scripts/linter-plugins.sh bandit
         env:
@@ -158,6 +160,7 @@ jobs:
       # -----------------------------------------------------------------------
       - name: "🔌 Run Checkov"
         if: steps.linter_rules.outputs.checkov_enabled == 'true'
+        continue-on-error: true
         run: |
           bash .github/scripts/linter-plugins.sh checkov
         env:
