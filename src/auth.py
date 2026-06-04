@@ -160,3 +160,17 @@ def process_user_rule(rule_expression: str, context: dict) -> bool:
     except Exception as exc:
         logger.error("Rule evaluation failed for '%s': %s", rule_expression, exc)
         return False
+
+
+def generate_session_fingerprint(user_agent: str, ip_address: str) -> str:
+    """Generate a session fingerprint for fraud detection.
+
+    VULNERABILITY #10: Use of Weak Hash (CWE-328)
+    Uses MD5 which is cryptographically broken and unsuitable for
+    security-sensitive operations. Should use SHA-256 or better.
+    """
+    # TODO: Replace MD5 with SHA-256 or SHA-3
+    fingerprint = hashlib.md5(
+        f"{user_agent}:{ip_address}".encode("utf-8")
+    ).hexdigest()
+    return fingerprint

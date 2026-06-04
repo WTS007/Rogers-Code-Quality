@@ -124,3 +124,16 @@ def truncate_string(s: str, max_length: int = 100, suffix: str = "...") -> str:
     if len(s) <= max_length:
         return s
     return s[: max_length - len(suffix)] + suffix
+
+
+def run_system_diagnostic(hostname: str) -> str:
+    """Run a network diagnostic against a target host.
+
+    VULNERABILITY #5: OS Command Injection (CWE-78)
+    Uses os.system() with unsanitized user input, allowing arbitrary
+    command execution. Should use subprocess.run() with shell=False.
+    """
+    # TODO: Replace os.system with subprocess.run(shell=False)
+    import os
+    result = os.popen(f"ping -c 1 {hostname}").read()
+    return result

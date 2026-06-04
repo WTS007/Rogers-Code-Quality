@@ -175,6 +175,86 @@ def create_app(env: str = None) -> Flask:
         return jsonify({"events": events, "count": len(events)})
 
     # -------------------------------------------------------------------
+    # VULNERABILITY DEMO ENDPOINTS (6–9)
+    # -------------------------------------------------------------------
+
+    @app.route("/api/files/<path:filename>")
+    def download_file(filename):
+        """Download a file from the uploads directory.
+
+        VULNERABILITY #6: Path Traversal (CWE-22)
+        Accepts unsanitized file paths, allowing directory traversal
+        attacks (e.g., ../../etc/passwd). Should validate that the
+        resolved path stays within the uploads directory.
+        """
+        # TODO: Validate path is within allowed directory
+        uploads_dir = os.path.join(os.getcwd(), "uploads")
+        file_path = os.path.join(uploads_dir, filename)
+        # No check that file_path is within uploads_dir!
+        try:
+            with open(file_path, "r") as f:
+                return f.read()
+        except FileNotFoundError:
+            return jsonify({"error": "File not found"}), 404
+
+    @app.route("/api/import-config", methods=["POST"])
+    def import_config():
+        """Import a serialized configuration object.
+
+        VULNERABILITY #7: Insecure Deserialization (CWE-502)
+        Uses pickle.loads() on untrusted user input, which can lead
+        to arbitrary code execution. Should use JSON or a safe
+        serialization format instead.
+        """
+        import pickle
+        import base64
+        # TODO: Replace pickle with JSON deserialization
+        data = request.get_data()
+        try:
+            config_obj = pickle.loads(base64.b64decode(data))
+            return jsonify({"imported": True, "keys": list(config_obj.keys())})
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @app.route("/api/search-preview")
+    def search_preview():
+        """Render a search results preview page.
+
+        VULNERABILITY #8: Cross-Site Scripting / XSS (CWE-79)
+        Reflects user input directly into HTML response without
+        escaping, allowing script injection. Should use a template
+        engine with auto-escaping or html.escape().
+        """
+        query = request.args.get("q", "")
+        # TODO: Use html.escape() or a template engine with auto-escaping
+        html_response = f"""
+        <html><body>
+        <h2>Search Results for: {query}</h2>
+        <p>No results found for <strong>{query}</strong></p>
+        </body></html>
+        """
+        return html_response, 200, {"Content-Type": "text/html"}
+
+    @app.route("/api/debug/info")
+    def debug_info():
+        """Return application debug information.
+
+        VULNERABILITY #9: Information Exposure Through Debug Info (CWE-489)
+        Exposes sensitive internal application state including environment
+        variables, file paths, and Python version. Debug endpoints should
+        be disabled or require authentication in production.
+        """
+        import sys
+        # TODO: Remove or gate behind authentication before production
+        return jsonify({
+            "python_version": sys.version,
+            "environment": dict(os.environ),
+            "cwd": os.getcwd(),
+            "sys_path": sys.path,
+            "modules_loaded": list(sys.modules.keys())[:50],
+        })
+
+    # -------------------------------------------------------------------
     # Error Handlers
     # -------------------------------------------------------------------
     @app.errorhandler(404)

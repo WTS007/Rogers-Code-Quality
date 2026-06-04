@@ -10,6 +10,12 @@ import os
 class Config:
     """Base configuration with sensible defaults."""
 
+    # VULNERABILITY #4: Hardcoded Credentials (CWE-798)
+    # Sensitive credentials should be loaded from environment variables or a secrets manager.
+    # This hardcoded API key will be detected by CodeQL and Bandit.
+    INTERNAL_API_KEY = "sk-nexus-prod-a8f3b2c1d4e5f6789012345678901234"
+    DATABASE_PASSWORD = "SuperSecret123!"
+
     SECRET_KEY = os.environ.get("SECRET_KEY", "nexus-demo-secret-key-change-in-production")
     DATABASE_PATH = os.environ.get("DATABASE_PATH", "nexus_demo.db")
     TOKEN_EXPIRY_HOURS = int(os.environ.get("TOKEN_EXPIRY_HOURS", "24"))

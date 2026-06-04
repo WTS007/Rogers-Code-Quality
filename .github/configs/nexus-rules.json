@@ -110,7 +110,7 @@
       "auto_fix": false
     },
     "bandit": {
-      "enabled": false,
+      "enabled": true,
       "version": "latest",
       "config_file": ".bandit.yml",
       "target_dirs": ["."],
