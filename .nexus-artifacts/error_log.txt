@@ -1,0 +1,69 @@
+Defaulting to user installation because normal site-packages is not writeable
+Collecting flask>=3.0.0 (from -r requirements.txt (line 1))
+  Downloading flask-3.1.3-py3-none-any.whl.metadata (3.2 kB)
+Collecting pytest>=8.0.0 (from -r requirements.txt (line 2))
+  Downloading pytest-9.0.3-py3-none-any.whl.metadata (7.6 kB)
+Requirement already satisfied: requests>=2.31.0 in /usr/lib/python3/dist-packages (from -r requirements.txt (line 3)) (2.31.0)
+Collecting blinker>=1.9.0 (from flask>=3.0.0->-r requirements.txt (line 1))
+  Downloading blinker-1.9.0-py3-none-any.whl.metadata (1.6 kB)
+Requirement already satisfied: click>=8.1.3 in /usr/lib/python3/dist-packages (from flask>=3.0.0->-r requirements.txt (line 1)) (8.1.6)
+Collecting itsdangerous>=2.2.0 (from flask>=3.0.0->-r requirements.txt (line 1))
+  Downloading itsdangerous-2.2.0-py3-none-any.whl.metadata (1.9 kB)
+Requirement already satisfied: jinja2>=3.1.2 in /usr/lib/python3/dist-packages (from flask>=3.0.0->-r requirements.txt (line 1)) (3.1.2)
+Requirement already satisfied: markupsafe>=2.1.1 in /usr/lib/python3/dist-packages (from flask>=3.0.0->-r requirements.txt (line 1)) (2.1.5)
+Collecting werkzeug>=3.1.0 (from flask>=3.0.0->-r requirements.txt (line 1))
+  Downloading werkzeug-3.1.8-py3-none-any.whl.metadata (4.0 kB)
+Collecting iniconfig>=1.0.1 (from pytest>=8.0.0->-r requirements.txt (line 2))
+  Downloading iniconfig-2.3.0-py3-none-any.whl.metadata (2.5 kB)
+Requirement already satisfied: packaging>=22 in /usr/lib/python3/dist-packages (from pytest>=8.0.0->-r requirements.txt (line 2)) (24.0)
+Collecting pluggy<2,>=1.5 (from pytest>=8.0.0->-r requirements.txt (line 2))
+  Downloading pluggy-1.6.0-py3-none-any.whl.metadata (4.8 kB)
+Requirement already satisfied: pygments>=2.7.2 in /usr/lib/python3/dist-packages (from pytest>=8.0.0->-r requirements.txt (line 2)) (2.17.2)
+Downloading flask-3.1.3-py3-none-any.whl (103 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 103.4/103.4 kB 5.5 MB/s eta 0:00:00
+Downloading pytest-9.0.3-py3-none-any.whl (375 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 375.2/375.2 kB 13.0 MB/s eta 0:00:00
+Downloading blinker-1.9.0-py3-none-any.whl (8.5 kB)
+Downloading iniconfig-2.3.0-py3-none-any.whl (7.5 kB)
+Downloading itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+Downloading pluggy-1.6.0-py3-none-any.whl (20 kB)
+Downloading werkzeug-3.1.8-py3-none-any.whl (226 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 226.5/226.5 kB 61.6 MB/s eta 0:00:00
+Installing collected packages: werkzeug, pluggy, itsdangerous, iniconfig, blinker, pytest, flask
+Successfully installed blinker-1.9.0 flask-3.1.3 iniconfig-2.3.0 itsdangerous-2.2.0 pluggy-1.6.0 pytest-9.0.3 werkzeug-3.1.8
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.0.3, pluggy-1.6.0
+rootdir: /home/runner/work/Rogers-Code-Quality/Rogers-Code-Quality
+collected 18 items
+
+tests/test_app.py ......                                                 [ 33%]
+tests/test_auth.py ...F....                                              [ 77%]
+tests/test_database.py ....                                              [100%]
+
+=================================== FAILURES ===================================
+_____________ TestAuthentication.test_permission_check_superadmin ______________
+
+self = <tests.test_auth.TestAuthentication testMethod=test_permission_check_superadmin>
+
+    def test_permission_check_superadmin(self):
+        """An admin token should have 'superadmin' access.
+    
+        *** INTENTIONAL FAILURE ***
+        This test incorrectly asserts that role='admin' satisfies
+        required_role='superadmin'. In the role hierarchy, admin (3)
+        is below superadmin (4), so this WILL fail.
+    
+        This failure triggers the AI remediation pipeline to:
+        1. Capture the pytest stderr in error_log.txt
+        2. Generate a fix (either correct the assertion or elevate the role)
+        3. Open an automated PR with the patch
+        """
+        token = generate_token(user_id=1, role="admin")
+        # This assertion is wrong: admin < superadmin in the hierarchy
+>       self.assertTrue(check_permissions(token, "superadmin"))
+E       AssertionError: False is not true
+
+tests/test_auth.py:90: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_auth.py::TestAuthentication::test_permission_check_superadmin - AssertionError: False is not true
+========================= 1 failed, 17 passed in 1.77s =========================
