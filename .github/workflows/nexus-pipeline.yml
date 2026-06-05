@@ -191,7 +191,8 @@ jobs:
 
     outputs:
       build_outcome: ${{ steps.build.outcome }}
-
+      build_failed: ${{ steps.build.outputs.build_failed }}
+  
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -243,7 +244,7 @@ jobs:
             cp /tmp/build_stderr.log "${GITHUB_WORKSPACE}/error_log.txt" 2>/dev/null || \
               echo "Build failed with exit code $BUILD_EXIT" > "${GITHUB_WORKSPACE}/error_log.txt"
             echo "build_failed=true" >> "$GITHUB_OUTPUT"
-            exit 1
+            echo "build_failed=true" >> "$GITHUB_OUTPUT"
           else
             echo "[nexus] ✅ Build succeeded"
             echo "build_failed=false" >> "$GITHUB_OUTPUT"
@@ -253,7 +254,7 @@ jobs:
       # Upload error log on failure
       # -----------------------------------------------------------------------
       - name: Upload error log
-        if: failure() || steps.build.outcome == 'failure'
+        if: steps.build.outputs.build_failed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: build-error-log
@@ -281,7 +282,7 @@ jobs:
     name: "🤖 AI Remediation"
     runs-on: ubuntu-latest
     needs: [build-and-test]
-    if: needs.build-and-test.outputs.build_outcome == 'failure' && !startsWith(github.head_ref || github.ref_name, 'ai-remediation/')
+    if: needs.build-and-test.outputs.build_failed == 'true' && !startsWith(github.head_ref || github.ref_name, 'ai-remediation/')
     timeout-minutes: 20
 
     env:
